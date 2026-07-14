@@ -1,17 +1,18 @@
-# IKBO Solicitudes - Sistema de Solicitudes de Producto y Ofertas de Proveedores
+# FlorFutures - Sistema de Contratos de Futuros de Flores
 
 ## Descripción
 
-Sistema web para gestionar solicitudes de productos entre clientes y proveedores, con soporte para ofertas, contraofertas y decisiones de aceptación/rechazo.
+Plataforma web para gestionar contratos de futuros de flores premium, conectando compradores y vendedores para acordar precios y cantidades de toneladas de flores frescas.
 
 ## Características
 
 - **Autenticación segura** con Supabase Auth (JWT)
-- **Roles de usuario**: Cliente, Proveedor, Ambos
-- **Gestión de solicitudes** con items y productos
-- **Sistema de ofertas** con precios y condiciones
+- **Roles de usuario**: Comprador, Vendedor, Ambos
+- **Gestión de contratos** de futuros con items de flores
+- **Sistema de ofertas** por tonelada con precios y condiciones
 - **Contraofertas** para negociación
 - **RLS (Row Level Security)** para seguridad a nivel de base de datos
+- **Flores premium**: Rosa, Clavel, Lirio, Gerbera, Crisantemo, Tulipán, Orquídea, Girasol
 
 ## Stack Tecnológico
 
@@ -122,14 +123,14 @@ PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
 
 ## Funcionalidades
 
-### Clientes
-- Crear solicitudes de productos
+### Compradores
+- Crear contratos de futuros con flores
 - Ver ofertas recibidas
 - Aceptar, rechazar o contraofertar
 
-### Proveedores
-- Ver solicitudes disponibles
-- Crear ofertas con precios
+### Vendedores
+- Ver contratos disponibles
+- Crear ofertas por tonelada
 - Responder a contraofertas
 
 ## Seguridad

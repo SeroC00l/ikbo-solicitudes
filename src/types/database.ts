@@ -1,4 +1,4 @@
-import type { UserRole, SolicitudEstado, OfertaEstado, ContraofertaEstado } from './index';
+import type { UserRole, ContratoEstado, OfertaEstado, ContraofertaEstado } from './index';
 
 export interface Database {
   public: {
@@ -29,80 +29,92 @@ export interface Database {
           created_at?: string;
         };
       };
-      productos: {
+      flores: {
         Row: {
           id: string;
           nombre: string;
-          descripcion: string;
-          unidad: string;
+          tipo: string;
+          color: string;
+          origen: string;
+          vida_util_dias: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           nombre: string;
-          descripcion: string;
-          unidad: string;
+          tipo: string;
+          color: string;
+          origen: string;
+          vida_util_dias: number;
           created_at?: string;
         };
         Update: {
           id?: string;
           nombre?: string;
-          descripcion?: string;
-          unidad?: string;
+          tipo?: string;
+          color?: string;
+          origen?: string;
+          vida_util_dias?: number;
           created_at?: string;
         };
       };
-      solicitudes: {
+      contratos: {
         Row: {
           id: string;
-          cliente_id: string;
+          comprador_id: string;
           titulo: string;
           descripcion: string;
-          estado: SolicitudEstado;
-          fecha_limite: string;
+          estado: ContratoEstado;
+          fecha_entrega: string;
+          precio_total: number;
           created_at: string;
         };
         Insert: {
           id?: string;
-          cliente_id: string;
+          comprador_id: string;
           titulo: string;
           descripcion: string;
-          estado?: SolicitudEstado;
-          fecha_limite: string;
+          estado?: ContratoEstado;
+          fecha_entrega: string;
+          precio_total?: number;
           created_at?: string;
         };
         Update: {
           id?: string;
-          cliente_id?: string;
+          comprador_id?: string;
           titulo?: string;
           descripcion?: string;
-          estado?: SolicitudEstado;
-          fecha_limite?: string;
+          estado?: ContratoEstado;
+          fecha_entrega?: string;
+          precio_total?: number;
           created_at?: string;
         };
       };
-      solicitud_items: {
+      contrato_items: {
         Row: {
           id: string;
-          solicitud_id: string;
-          producto_id: string;
-          cantidad: number;
+          contrato_id: string;
+          flor_id: string;
+          toneladas: number;
+          precio_por_tonelada: number;
           especificaciones: string;
           created_at: string;
         };
         Insert: {
           id?: string;
-          solicitud_id: string;
-          producto_id: string;
-          cantidad: number;
+          contrato_id: string;
+          flor_id: string;
+          toneladas: number;
+          precio_por_tonelada: number;
           especificaciones: string;
           created_at?: string;
         };
         Update: {
           id?: string;
-          solicitud_id?: string;
-          producto_id?: string;
-          cantidad?: number;
+          contrato_id?: string;
+          flor_id?: string;
+          toneladas?: number;
+          precio_por_tonelada?: number;
           especificaciones?: string;
           created_at?: string;
         };
@@ -110,9 +122,9 @@ export interface Database {
       ofertas: {
         Row: {
           id: string;
-          solicitud_item_id: string;
-          proveedor_id: string;
-          precio_unitario: number;
+          contrato_item_id: string;
+          vendedor_id: string;
+          precio_por_tonelada: number;
           precio_total: number;
           tiempo_entrega_dias: number;
           condiciones: string;
@@ -121,9 +133,9 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          solicitud_item_id: string;
-          proveedor_id: string;
-          precio_unitario: number;
+          contrato_item_id: string;
+          vendedor_id: string;
+          precio_por_tonelada: number;
           precio_total: number;
           tiempo_entrega_dias: number;
           condiciones: string;
@@ -132,9 +144,9 @@ export interface Database {
         };
         Update: {
           id?: string;
-          solicitud_item_id?: string;
-          proveedor_id?: string;
-          precio_unitario?: number;
+          contrato_item_id?: string;
+          vendedor_id?: string;
+          precio_por_tonelada?: number;
           precio_total?: number;
           tiempo_entrega_dias?: number;
           condiciones?: string;
@@ -146,8 +158,8 @@ export interface Database {
         Row: {
           id: string;
           oferta_id: string;
-          cliente_id: string;
-          precio_unitario: number;
+          comprador_id: string;
+          precio_por_tonelada: number;
           mensaje: string;
           estado: ContraofertaEstado;
           created_at: string;
@@ -155,8 +167,8 @@ export interface Database {
         Insert: {
           id?: string;
           oferta_id: string;
-          cliente_id: string;
-          precio_unitario: number;
+          comprador_id: string;
+          precio_por_tonelada: number;
           mensaje: string;
           estado?: ContraofertaEstado;
           created_at?: string;
@@ -164,8 +176,8 @@ export interface Database {
         Update: {
           id?: string;
           oferta_id?: string;
-          cliente_id?: string;
-          precio_unitario?: number;
+          comprador_id?: string;
+          precio_por_tonelada?: number;
           mensaje?: string;
           estado?: ContraofertaEstado;
           created_at?: string;
@@ -174,7 +186,7 @@ export interface Database {
     };
     Enums: {
       user_role: UserRole;
-      solicitud_estado: SolicitudEstado;
+      contrato_estado: ContratoEstado;
       oferta_estado: OfertaEstado;
       contraoferta_estado: ContraofertaEstado;
     };

@@ -41,7 +41,7 @@ const { id } = Astro.params;
   async function loadOferta() {
     const { data, error } = await supabase
       .from('ofertas')
-      .select('*, proveedor:usuarios(*), solicitud_item:solicitud_items(*, solicitud:solicitudes(*), producto:productos(*)), contraofertas(*, cliente:usuarios(*))')
+      .select('*, vendedor:usuarios(*), contrato_item:contrato_items(*, contrato:contratos(*), flor:flores(*)), contraofertas(*, comprador:usuarios(*))')
       .eq('id', ofertaId)
       .single();
 
@@ -57,8 +57,8 @@ const { id } = Astro.params;
     }
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const isOwner = user.id === data.proveedor_id;
-    const isCliente = user.id === data.solicitud_item?.solicitud?.cliente_id;
+    const isOwner = user.id === data.vendedor_id;
+    const isComprador = user.id === data.contrato_item?.contrato?.comprador_id;
 
     if (container) {
       container.innerHTML = `
@@ -66,8 +66,8 @@ const { id } = Astro.params;
           <div class="border-b pb-4">
             <div class="flex justify-between items-start">
               <div>
-                <h2 class="text-2xl font-bold text-gray-900">${data.solicitud_item?.producto?.nombre || 'Producto'}</h2>
-                <p class="text-gray-600 mt-1">Solicitud: ${data.solicitud_item?.solicitud?.titulo || 'N/A'}</p>
+                <h2 class="text-2xl font-bold text-gray-900">${data.contrato_item?.flor?.nombre || 'Flor'}</h2>
+                <p class="text-gray-600 mt-1">Contrato: ${data.contrato_item?.contrato?.titulo || 'N/A'}</p>
               </div>
               <span class="px-3 py-1 rounded-full text-sm font-medium ${getEstadoColor(data.estado)}">
                 ${data.estado.toUpperCase()}
@@ -77,18 +77,18 @@ const { id } = Astro.params;
 
           <div class="grid grid-cols-2 gap-6">
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">Información del Proveedor</h3>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Información del Vendedor</h3>
               <div class="bg-gray-50 p-4 rounded-lg">
-                <p class="text-gray-900">${data.proveedor?.full_name || 'N/A'}</p>
-                <p class="text-gray-600">${data.proveedor?.empresa || 'N/A'}</p>
-                <p class="text-gray-600">${data.proveedor?.email || 'N/A'}</p>
+                <p class="text-gray-900">${data.vendedor?.full_name || 'N/A'}</p>
+                <p class="text-gray-600">${data.vendedor?.empresa || 'N/A'}</p>
+                <p class="text-gray-600">${data.vendedor?.email || 'N/A'}</p>
               </div>
             </div>
 
             <div>
               <h3 class="text-lg font-semibold text-gray-900 mb-2">Detalles de la Oferta</h3>
               <div class="bg-gray-50 p-4 rounded-lg space-y-2">
-                <p><span class="font-medium">Precio Unitario:</span> $${data.precio_unitario}</p>
+                <p><span class="font-medium">Precio por Tonelada:</span> $${data.precio_por_tonelada}</p>
                 <p><span class="font-medium">Precio Total:</span> $${data.precio_total}</p>
                 <p><span class="font-medium">Tiempo de Entrega:</span> ${data.tiempo_entrega_dias} días</p>
                 <p><span class="font-medium">Condiciones:</span> ${data.condiciones || 'Sin condiciones'}</p>
@@ -104,8 +104,8 @@ const { id } = Astro.params;
                   <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
                     <div class="flex justify-between items-start">
                       <div>
-                        <p class="font-medium text-gray-900">${contra.cliente?.full_name || 'Cliente'}</p>
-                        <p class="text-lg font-semibold text-purple-700">$${contra.precio_unitario}</p>
+                        <p class="font-medium text-gray-900">${contra.comprador?.full_name || 'Comprador'}</p>
+                        <p class="text-lg font-semibold text-purple-700">$${contra.precio_por_tonelada}/tonelada</p>
                       </div>
                       <span class="px-2 py-1 text-xs font-medium rounded-full ${getEstadoColor(contra.estado)}">
                         ${contra.estado}
@@ -129,9 +129,9 @@ const { id } = Astro.params;
             </div>
           ` : ''}
 
-          ${isCliente && data.estado === 'pendiente' ? `
+          ${isComprador && data.estado === 'pendiente' ? `
             <div class="border-t pt-6">
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Acciones del Cliente</h3>
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Acciones del Comprador</h3>
               <div class="flex gap-4">
                 <button class="aceptar-oferta px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                   Aceptar Oferta
@@ -185,7 +185,7 @@ const { id } = Astro.params;
         <h3 class="text-lg font-semibold mb-4">Contraofertar</h3>
         <form id="contraoferta-form" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700">Tu precio propuesto</label>
+            <label class="block text-sm font-medium text-gray-700">Tu precio propuesto (por tonelada)</label>
             <input type="number" name="precio_unitario" step="0.01" required class="w-full px-3 py-2 border rounded-lg" />
           </div>
           <div>
@@ -209,8 +209,8 @@ const { id } = Astro.params;
       
       await supabase.from('contraofertas').insert({
         oferta_id: ofertaId,
-        cliente_id: user.id,
-        precio_unitario: parseFloat(formData.get('precio_unitario') as string),
+        comprador_id: user.id,
+        precio_por_tonelada: parseFloat(formData.get('precio_unitario') as string),
         mensaje: formData.get('mensaje') as string,
         estado: 'pendiente',
       });

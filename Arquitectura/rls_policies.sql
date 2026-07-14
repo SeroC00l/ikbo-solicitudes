@@ -1,13 +1,36 @@
--- Row Level Security Policies for IKBO Solicitudes System
+-- Row Level Security Policies for FlorFutures
 -- Run this after creating the schema
 
 -- Enable RLS on all tables
 ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
-ALTER TABLE productos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE solicitudes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE solicitud_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE flores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contratos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contrato_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ofertas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contraofertas ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "usuarios_select_own" ON usuarios;
+  DROP POLICY IF EXISTS "usuarios_select_public" ON usuarios;
+  DROP POLICY IF EXISTS "usuarios_insert_own" ON usuarios;
+  DROP POLICY IF EXISTS "usuarios_update_own" ON usuarios;
+  DROP POLICY IF EXISTS "flores_select_public" ON flores;
+  DROP POLICY IF EXISTS "flores_insert_authenticated" ON flores;
+  DROP POLICY IF EXISTS "contratos_select_involved" ON contratos;
+  DROP POLICY IF EXISTS "contratos_insert_comprador" ON contratos;
+  DROP POLICY IF EXISTS "contratos_update_owner" ON contratos;
+  DROP POLICY IF EXISTS "contrato_items_select_contrato" ON contrato_items;
+  DROP POLICY IF EXISTS "contrato_items_insert_comprador" ON contrato_items;
+  DROP POLICY IF EXISTS "ofertas_select_involved" ON ofertas;
+  DROP POLICY IF EXISTS "ofertas_insert_vendedor" ON ofertas;
+  DROP POLICY IF EXISTS "ofertas_update_vendedor" ON ofertas;
+  DROP POLICY IF EXISTS "ofertas_update_comprador" ON ofertas;
+  DROP POLICY IF EXISTS "contraofertas_select_involved" ON contraofertas;
+  DROP POLICY IF EXISTS "contraofertas_insert_comprador" ON contraofertas;
+  DROP POLICY IF EXISTS "contraofertas_update_vendedor" ON contraofertas;
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
 
 -- Usuarios policies
 CREATE POLICY "usuarios_select_own" ON usuarios
@@ -22,123 +45,123 @@ CREATE POLICY "usuarios_insert_own" ON usuarios
 CREATE POLICY "usuarios_update_own" ON usuarios
   FOR UPDATE USING (auth.uid() = id);
 
--- Productos policies (public read)
-CREATE POLICY "productos_select_public" ON productos
+-- Flores policies (public read)
+CREATE POLICY "flores_select_public" ON flores
   FOR SELECT USING (true);
 
-CREATE POLICY "productos_insert_authenticated" ON productos
+CREATE POLICY "flores_insert_authenticated" ON flores
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
--- Solicitudes policies
-CREATE POLICY "solicitudes_select_owner" ON solicitudes
+-- Contratos policies
+CREATE POLICY "contratos_select_involved" ON contratos
   FOR SELECT USING (
-    cliente_id = auth.uid() OR
+    comprador_id = auth.uid() OR
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE id = auth.uid() AND rol IN ('proveedor', 'ambos')
+      WHERE id = auth.uid() AND rol IN ('vendedor', 'ambos')
     )
   );
 
-CREATE POLICY "solicitudes_insert_cliente" ON solicitudes
+CREATE POLICY "contratos_insert_comprador" ON contratos
   FOR INSERT WITH CHECK (
-    cliente_id = auth.uid() AND
+    comprador_id = auth.uid() AND
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE id = auth.uid() AND rol IN ('cliente', 'ambos')
+      WHERE id = auth.uid() AND rol IN ('comprador', 'ambos')
     )
   );
 
-CREATE POLICY "solicitudes_update_owner" ON solicitudes
+CREATE POLICY "contratos_update_owner" ON contratos
   FOR UPDATE USING (
-    cliente_id = auth.uid()
+    comprador_id = auth.uid()
   );
 
--- Solicitud Items policies
-CREATE POLICY "solicitud_items_select_solicitud" ON solicitud_items
+-- Contrato Items policies
+CREATE POLICY "contrato_items_select_contrato" ON contrato_items
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM solicitudes
-      WHERE id = solicitud_items.solicitud_id
+      SELECT 1 FROM contratos
+      WHERE id = contrato_items.contrato_id
       AND (
-        cliente_id = auth.uid() OR
+        comprador_id = auth.uid() OR
         EXISTS (
           SELECT 1 FROM usuarios
-          WHERE id = auth.uid() AND rol IN ('proveedor', 'ambos')
+          WHERE id = auth.uid() AND rol IN ('vendedor', 'ambos')
         )
       )
     )
   );
 
-CREATE POLICY "solicitud_items_insert_solicitud_owner" ON solicitud_items
+CREATE POLICY "contrato_items_insert_comprador" ON contrato_items
   FOR INSERT WITH CHECK (
     EXISTS (
-      SELECT 1 FROM solicitudes
-      WHERE id = solicitud_items.solicitud_id
-      AND cliente_id = auth.uid()
+      SELECT 1 FROM contratos
+      WHERE id = contrato_items.contrato_id
+      AND comprador_id = auth.uid()
     )
   );
 
 -- Ofertas policies
 CREATE POLICY "ofertas_select_involved" ON ofertas
   FOR SELECT USING (
-    proveedor_id = auth.uid() OR
+    vendedor_id = auth.uid() OR
     EXISTS (
-      SELECT 1 FROM solicitud_items si
-      JOIN solicitudes s ON s.id = si.solicitud_id
-      WHERE si.id = ofertas.solicitud_item_id
-      AND s.cliente_id = auth.uid()
+      SELECT 1 FROM contrato_items ci
+      JOIN contratos c ON c.id = ci.contrato_id
+      WHERE ci.id = ofertas.contrato_item_id
+      AND c.comprador_id = auth.uid()
     )
   );
 
-CREATE POLICY "ofertas_insert_proveedor" ON ofertas
+CREATE POLICY "ofertas_insert_vendedor" ON ofertas
   FOR INSERT WITH CHECK (
-    proveedor_id = auth.uid() AND
+    vendedor_id = auth.uid() AND
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE id = auth.uid() AND rol IN ('proveedor', 'ambos')
+      WHERE id = auth.uid() AND rol IN ('vendedor', 'ambos')
     )
   );
 
-CREATE POLICY "ofertas_updateProveedor" ON ofertas
+CREATE POLICY "ofertas_update_vendedor" ON ofertas
   FOR UPDATE USING (
-    proveedor_id = auth.uid()
+    vendedor_id = auth.uid()
   );
 
-CREATE POLICY "ofertas_updateCliente" ON ofertas
+CREATE POLICY "ofertas_update_comprador" ON ofertas
   FOR UPDATE USING (
     EXISTS (
-      SELECT 1 FROM solicitud_items si
-      JOIN solicitudes s ON s.id = si.solicitud_id
-      WHERE si.id = ofertas.solicitud_item_id
-      AND s.cliente_id = auth.uid()
+      SELECT 1 FROM contrato_items ci
+      JOIN contratos c ON c.id = ci.contrato_id
+      WHERE ci.id = ofertas.contrato_item_id
+      AND c.comprador_id = auth.uid()
     )
   );
 
 -- Contraofertas policies
 CREATE POLICY "contraofertas_select_involved" ON contraofertas
   FOR SELECT USING (
-    cliente_id = auth.uid() OR
+    comprador_id = auth.uid() OR
     EXISTS (
       SELECT 1 FROM ofertas
       WHERE id = contraofertas.oferta_id
-      AND proveedor_id = auth.uid()
+      AND vendedor_id = auth.uid()
     )
   );
 
-CREATE POLICY "contraofertas_insert_cliente" ON contraofertas
+CREATE POLICY "contraofertas_insert_comprador" ON contraofertas
   FOR INSERT WITH CHECK (
-    cliente_id = auth.uid() AND
+    comprador_id = auth.uid() AND
     EXISTS (
       SELECT 1 FROM usuarios
-      WHERE id = auth.uid() AND rol IN ('cliente', 'ambos')
+      WHERE id = auth.uid() AND rol IN ('comprador', 'ambos')
     )
   );
 
-CREATE POLICY "contraofertas_update_proveedor" ON contraofertas
+CREATE POLICY "contraofertas_update_vendedor" ON contraofertas
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM ofertas
       WHERE id = contraofertas.oferta_id
-      AND proveedor_id = auth.uid()
+      AND vendedor_id = auth.uid()
     )
   );

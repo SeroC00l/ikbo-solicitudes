@@ -1,1 +1,0 @@
-import{t as e}from"./supabase.B-pwCiwl.js";document.getElementById(`logout-btn`)?.addEventListener(`click`,async()=>{await e.auth.signOut(),window.location.href=`/`});

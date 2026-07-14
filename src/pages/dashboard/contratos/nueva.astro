@@ -5,44 +5,45 @@ import Input from '@/components/ui/Input.astro';
 import Textarea from '@/components/ui/Textarea.astro';
 ---
 
-<LayoutDashboard title="Nueva Solicitud">
+<LayoutDashboard title="Nuevo Contrato">
   <div class="max-w-4xl mx-auto space-y-6">
-    <div>
-      <h1 class="text-3xl font-bold text-gray-900">Nueva Solicitud</h1>
-      <p class="mt-2 text-gray-600">Crea una nueva solicitud de productos</p>
+    <div class="flex items-center gap-4">
+      <span class="text-3xl">📝</span>
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">Nuevo Contrato de Futuros</h1>
+        <p class="mt-2 text-gray-600">Crea un nuevo contrato para compra/venta de flores</p>
+      </div>
     </div>
 
-    <form id="solicitud-form" class="bg-white p-6 rounded-lg shadow-md space-y-6">
+    <form id="contrato-form" class="bg-white p-6 rounded-lg shadow-md space-y-6">
       <Input
-        label="Título de la Solicitud"
+        label="Título del Contrato"
         name="titulo"
         required
-        placeholder="Ej: Solicitud de materiales de oficina"
+        placeholder="Ej: Compra de 50 toneladas de Rosas Rojas"
       />
 
       <Textarea
         label="Descripción"
         name="descripcion"
         required
-        placeholder="Describe los detalles de tu solicitud..."
+        placeholder="Describe los detalles del contrato de futuros..."
         rows={4}
       />
 
       <Input
-        label="Fecha Límite"
-        name="fecha_limite"
+        label="Fecha de Entrega"
+        name="fecha_entrega"
         type="date"
         required
       />
 
       <div class="border-t pt-6">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">Items de la Solicitud</h3>
+          <h3 class="text-lg font-semibold text-gray-900">Items del Contrato</h3>
           <Button type="button" variant="secondary" id="add-item-btn">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Agregar Item
+            <span class="mr-2">➕</span>
+            Agregar Flor
           </Button>
         </div>
 
@@ -54,13 +55,13 @@ import Textarea from '@/components/ui/Textarea.astro';
       <div id="error-message" class="hidden text-sm text-red-600 bg-red-50 p-3 rounded-lg"></div>
 
       <div class="flex justify-end gap-4">
-        <a href="/dashboard/solicitudes">
+        <a href="/dashboard/contratos">
           <Button variant="secondary" type="button">
             Cancelar
           </Button>
         </a>
         <Button type="submit" id="submit-btn">
-          Crear Solicitud
+          Crear Contrato
         </Button>
       </div>
     </form>
@@ -70,28 +71,28 @@ import Textarea from '@/components/ui/Textarea.astro';
 <script>
   import { supabase } from '@/lib/supabase';
 
-  const form = document.getElementById('solicitud-form') as HTMLFormElement;
+  const form = document.getElementById('contrato-form') as HTMLFormElement;
   const itemsContainer = document.getElementById('items-container');
   const addItemBtn = document.getElementById('add-item-btn');
   const errorDiv = document.getElementById('error-message');
   const submitBtn = document.getElementById('submit-btn');
 
-  let items: Array<{ nombre: string; unidad: string; cantidad: number; especificaciones: string }> = [];
-  let productos: Array<{ id: string; nombre: string; unidad: string }> = [];
+  let items: Array<{ florId: string; toneladas: number; precioPorTonelada: number; especificaciones: string }> = [];
+  let flores: Array<{ id: string; nombre: string; tipo: string }> = [];
 
-  // Load products
-  async function loadProductos() {
-    const { data } = await supabase.from('productos').select('*').order('nombre');
+  // Load flowers
+  async function loadFlores() {
+    const { data } = await supabase.from('flores').select('*').order('nombre');
     if (data) {
-      productos = data;
+      flores = data;
       renderItems();
     }
   }
 
-  loadProductos();
+  loadFlores();
 
   addItemBtn?.addEventListener('click', () => {
-    items.push({ nombre: '', unidad: '', cantidad: 1, especificaciones: '' });
+    items.push({ florId: '', toneladas: 1, precioPorTonelada: 0, especificaciones: '' });
     renderItems();
   });
 
@@ -101,7 +102,7 @@ import Textarea from '@/components/ui/Textarea.astro';
     if (items.length === 0) {
       itemsContainer.innerHTML = `
         <div class="text-center py-8 text-gray-500">
-          No hay items. Haz clic en "Agregar Item" para añadir productos a tu solicitud.
+          No hay flores agregadas. Haz clic en "Agregar Flor" para añadir productos a tu contrato.
         </div>
       `;
       return;
@@ -110,7 +111,7 @@ import Textarea from '@/components/ui/Textarea.astro';
     itemsContainer.innerHTML = items.map((item, index) => `
       <div class="bg-gray-50 p-4 rounded-lg border" data-index="${index}">
         <div class="flex justify-between items-start mb-4">
-          <h4 class="font-medium text-gray-900">Item ${index + 1}</h4>
+          <h4 class="font-medium text-gray-900">Flor ${index + 1}</h4>
           <button type="button" class="text-red-600 hover:text-red-800 remove-item" data-index="${index}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -119,37 +120,53 @@ import Textarea from '@/components/ui/Textarea.astro';
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Producto</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Flor</label>
             <select 
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 product-select"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 flor-select"
               data-index="${index}"
             >
-              <option value="">Seleccionar producto</option>
-              ${productos.map(p => `
-                <option value="${p.id}" ${item.nombre === p.id ? 'selected' : ''}>${p.nombre} (${p.unidad})</option>
+              <option value="">Seleccionar flor</option>
+              ${flores.map(f => `
+                <option value="${f.id}" ${item.florId === f.id ? 'selected' : ''}>${f.nombre} (${f.tipo})</option>
               `).join('')}
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Toneladas</label>
             <input 
               type="number" 
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 quantity-input"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 toneladas-input"
               data-index="${index}"
-              value="${item.cantidad}"
-              min="1"
+              value="${item.toneladas}"
+              min="0.1"
+              step="0.1"
             />
           </div>
-          <div class="md:col-span-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Precio por Tonelada (USD)</label>
+            <input 
+              type="number" 
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 precio-input"
+              data-index="${index}"
+              value="${item.precioPorTonelada}"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Especificaciones</label>
             <input 
               type="text" 
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 specs-input"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 specs-input"
               data-index="${index}"
               value="${item.especificaciones}"
               placeholder="Especificaciones adicionales..."
             />
           </div>
+        </div>
+        <div class="mt-3 text-right">
+          <span class="text-sm text-gray-600">Total: </span>
+          <span class="font-semibold text-gray-900">$${(item.toneladas * item.precioPorTonelada).toFixed(2)}</span>
         </div>
       </div>
     `).join('');
@@ -163,18 +180,26 @@ import Textarea from '@/components/ui/Textarea.astro';
       });
     });
 
-    document.querySelectorAll('.product-select').forEach(select => {
+    document.querySelectorAll('.flor-select').forEach(select => {
       select.addEventListener('change', (e) => {
         const index = parseInt((e.currentTarget as HTMLElement).dataset.index || '0');
-        const productoId = (e.target as HTMLSelectElement).value;
-        items[index].nombre = productoId;
+        items[index].florId = (e.target as HTMLSelectElement).value;
       });
     });
 
-    document.querySelectorAll('.quantity-input').forEach(input => {
+    document.querySelectorAll('.toneladas-input').forEach(input => {
       input.addEventListener('change', (e) => {
         const index = parseInt((e.currentTarget as HTMLElement).dataset.index || '0');
-        items[index].cantidad = parseInt((e.target as HTMLInputElement).value) || 1;
+        items[index].toneladas = parseFloat((e.target as HTMLInputElement).value) || 1;
+        renderItems();
+      });
+    });
+
+    document.querySelectorAll('.precio-input').forEach(input => {
+      input.addEventListener('change', (e) => {
+        const index = parseInt((e.currentTarget as HTMLElement).dataset.index || '0');
+        items[index].precioPorTonelada = parseFloat((e.target as HTMLInputElement).value) || 0;
+        renderItems();
       });
     });
 
@@ -192,11 +217,11 @@ import Textarea from '@/components/ui/Textarea.astro';
     const formData = new FormData(form);
     const titulo = formData.get('titulo') as string;
     const descripcion = formData.get('descripcion') as string;
-    const fecha_limite = formData.get('fecha_limite') as string;
+    const fecha_entrega = formData.get('fecha_entrega') as string;
 
     if (items.length === 0) {
       if (errorDiv) {
-        errorDiv.textContent = 'Debe agregar al menos un item a la solicitud';
+        errorDiv.textContent = 'Debe agregar al menos una flor al contrato';
         errorDiv.classList.remove('hidden');
       }
       return;
@@ -208,36 +233,41 @@ import Textarea from '@/components/ui/Textarea.astro';
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-      // Create solicitud
-      const { data: solicitud, error: solicitudError } = await supabase
-        .from('solicitudes')
+      // Calculate total price
+      const precioTotal = items.reduce((sum, item) => sum + (item.toneladas * item.precioPorTonelada), 0);
+
+      // Create contrato
+      const { data: contrato, error: contratoError } = await supabase
+        .from('contratos')
         .insert({
-          cliente_id: user.id,
+          comprador_id: user.id,
           titulo,
           descripcion,
-          fecha_limite,
+          fecha_entrega,
+          precio_total: precioTotal,
           estado: 'pendiente',
         })
         .select()
         .single();
 
-      if (solicitudError) throw solicitudError;
+      if (contratoError) throw contratoError;
 
       // Create items
       const itemsToInsert = items.map(item => ({
-        solicitud_id: solicitud.id,
-        producto_id: item.nombre,
-        cantidad: item.cantidad,
+        contrato_id: contrato.id,
+        flor_id: item.florId,
+        toneladas: item.toneladas,
+        precio_por_tonelada: item.precioPorTonelada,
         especificaciones: item.especificaciones,
       }));
 
       const { error: itemsError } = await supabase
-        .from('solicitud_items')
+        .from('contrato_items')
         .insert(itemsToInsert);
 
       if (itemsError) throw itemsError;
 
-      window.location.href = '/dashboard/solicitudes';
+      window.location.href = '/dashboard/contratos';
     } catch (error) {
       if (errorDiv) {
         errorDiv.textContent = (error as Error).message;

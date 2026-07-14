@@ -1,10 +1,10 @@
-# Justificación de Decisiones Técnicas
+# Justificación de Decisiones Técnicas - FlorFutures
 
 ## 1. ¿Por qué elegí la estructura arquitectónica propuesta?
 
 ### Arquitectura JAMstack/Serverless
 
-Elegí una arquitectura **JAMstack** (JavaScript, APIs, Markup) con **Serverless** por las siguientes razones:
+Elegí una arquitectura **JAMstack** (JavaScript, APIs, Markup) con **Serverless** para el sistema de contratos de futuros de flores por las siguientes razones:
 
 1. **Rendimiento**: Astro genera HTML estático que se carga rápidamente, mientras que React maneja las partes interactivas (Islands Architecture).
 

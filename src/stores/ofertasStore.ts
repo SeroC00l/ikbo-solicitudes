@@ -7,11 +7,11 @@ interface OfertasState {
   ofertaActual: Oferta | null;
   loading: boolean;
   error: string | null;
-  fetchOfertas: (proveedorId?: string) => Promise<void>;
+  fetchOfertas: (vendedorId?: string) => Promise<void>;
   fetchOfertaById: (id: string) => Promise<void>;
-  createOferta: (oferta: Omit<Oferta, 'id' | 'created_at' | 'proveedor'>) => Promise<void>;
+  createOferta: (oferta: Omit<Oferta, 'id' | 'created_at' | 'vendedor'>) => Promise<void>;
   updateOfertaEstado: (id: string, estado: Oferta['estado']) => Promise<void>;
-  createContraoferta: (contraoferta: Omit<Contraoferta, 'id' | 'created_at' | 'cliente'>) => Promise<void>;
+  createContraoferta: (contraoferta: Omit<Contraoferta, 'id' | 'created_at' | 'comprador'>) => Promise<void>;
   updateContraofertaEstado: (id: string, estado: Contraoferta['estado']) => Promise<void>;
   clearError: () => void;
 }
@@ -22,16 +22,16 @@ export const useOfertasStore = create<OfertasState>((set) => ({
   loading: false,
   error: null,
 
-  fetchOfertas: async (proveedorId) => {
+  fetchOfertas: async (vendedorId) => {
     try {
       set({ loading: true, error: null });
       let query = supabase
         .from('ofertas')
-        .select('*, proveedor:usuarios(*), solicitud_item:solicitud_items(*, solicitud:solicitudes(*), producto:productos(*)), contraofertas(*, cliente:usuarios(*))')
+        .select('*, vendedor:usuarios(*), contrato_item:contrato_items(*, contrato:contratos(*), flor:flores(*)), contraofertas(*, comprador:usuarios(*))')
         .order('created_at', { ascending: false });
 
-      if (proveedorId) {
-        query = query.eq('proveedor_id', proveedorId);
+      if (vendedorId) {
+        query = query.eq('vendedor_id', vendedorId);
       }
 
       const { data, error } = await query;
@@ -47,7 +47,7 @@ export const useOfertasStore = create<OfertasState>((set) => ({
       set({ loading: true, error: null });
       const { data, error } = await supabase
         .from('ofertas')
-        .select('*, proveedor:usuarios(*), solicitud_item:solicitud_items(*, solicitud:solicitudes(*), producto:productos(*)), contraofertas(*, cliente:usuarios(*))')
+        .select('*, vendedor:usuarios(*), contrato_item:contrato_items(*, contrato:contratos(*), flor:flores(*)), contraofertas(*, comprador:usuarios(*))')
         .eq('id', id)
         .single();
 
