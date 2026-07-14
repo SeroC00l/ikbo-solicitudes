@@ -1,0 +1,244 @@
+---
+export const prerender = false;
+
+import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
+import Button from '@/components/ui/Button.astro';
+import Badge from '@/components/ui/Badge.astro';
+
+const { id } = Astro.params;
+---
+
+<LayoutDashboard title="Detalle de Oferta">
+  <div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+      <div>
+        <a href="/dashboard/ofertas" class="text-blue-600 hover:text-blue-800 text-sm">
+          ← Volver a ofertas
+        </a>
+        <h1 class="text-3xl font-bold text-gray-900 mt-2">Detalle de Oferta</h1>
+      </div>
+    </div>
+
+    <div id="oferta-detail" class="bg-white rounded-lg shadow-md p-6">
+      <p class="text-gray-600">Cargando detalles...</p>
+    </div>
+  </div>
+</LayoutDashboard>
+
+<script>
+  import { supabase } from '@/lib/supabase';
+
+  const container = document.getElementById('oferta-detail');
+  const urlParts = window.location.pathname.split('/');
+  const ofertaId = urlParts[urlParts.length - 1];
+
+  if (!ofertaId) {
+    window.location.href = '/dashboard/ofertas';
+  } else {
+    loadOferta();
+  }
+
+  async function loadOferta() {
+    const { data, error } = await supabase
+      .from('ofertas')
+      .select('*, proveedor:usuarios(*), solicitud_item:solicitud_items(*, solicitud:solicitudes(*), producto:productos(*)), contraofertas(*, cliente:usuarios(*))')
+      .eq('id', ofertaId)
+      .single();
+
+    if (error || !data) {
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-red-600">
+            Error al cargar la oferta: ${error?.message || 'No encontrada'}
+          </div>
+        `;
+      }
+      return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isOwner = user.id === data.proveedor_id;
+    const isCliente = user.id === data.solicitud_item?.solicitud?.cliente_id;
+
+    if (container) {
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="border-b pb-4">
+            <div class="flex justify-between items-start">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-900">${data.solicitud_item?.producto?.nombre || 'Producto'}</h2>
+                <p class="text-gray-600 mt-1">Solicitud: ${data.solicitud_item?.solicitud?.titulo || 'N/A'}</p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-sm font-medium ${getEstadoColor(data.estado)}">
+                ${data.estado.toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Información del Proveedor</h3>
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-gray-900">${data.proveedor?.full_name || 'N/A'}</p>
+                <p class="text-gray-600">${data.proveedor?.empresa || 'N/A'}</p>
+                <p class="text-gray-600">${data.proveedor?.email || 'N/A'}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Detalles de la Oferta</h3>
+              <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                <p><span class="font-medium">Precio Unitario:</span> $${data.precio_unitario}</p>
+                <p><span class="font-medium">Precio Total:</span> $${data.precio_total}</p>
+                <p><span class="font-medium">Tiempo de Entrega:</span> ${data.tiempo_entrega_dias} días</p>
+                <p><span class="font-medium">Condiciones:</span> ${data.condiciones || 'Sin condiciones'}</p>
+              </div>
+            </div>
+          </div>
+
+          ${data.contraofertas && data.contraofertas.length > 0 ? `
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Contraofertas Recibidas</h3>
+              <div class="space-y-4">
+                ${data.contraofertas.map((contra: any) => `
+                  <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-medium text-gray-900">${contra.cliente?.full_name || 'Cliente'}</p>
+                        <p class="text-lg font-semibold text-purple-700">$${contra.precio_unitario}</p>
+                      </div>
+                      <span class="px-2 py-1 text-xs font-medium rounded-full ${getEstadoColor(contra.estado)}">
+                        ${contra.estado}
+                      </span>
+                    </div>
+                    ${contra.mensaje ? `<p class="text-gray-700 mt-2">${contra.mensaje}</p>` : ''}
+                    
+                    ${isOwner && contra.estado === 'pendiente' ? `
+                      <div class="mt-3 flex gap-2">
+                        <button class="aceptar-contraoferta px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700" data-id="${contra.id}">
+                          Aceptar
+                        </button>
+                        <button class="rechazar-contraoferta px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700" data-id="${contra.id}">
+                          Rechazar
+                        </button>
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${isCliente && data.estado === 'pendiente' ? `
+            <div class="border-t pt-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Acciones del Cliente</h3>
+              <div class="flex gap-4">
+                <button class="aceptar-oferta px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                  Aceptar Oferta
+                </button>
+                <button class="rechazar-oferta px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                  Rechazar Oferta
+                </button>
+                <button class="contraofertar-btn px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                  Contraofertar
+                </button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // Add event listeners
+      document.querySelector('.aceptar-oferta')?.addEventListener('click', async () => {
+        await updateOfertaEstado('aceptada');
+      });
+
+      document.querySelector('.rechazar-oferta')?.addEventListener('click', async () => {
+        await updateOfertaEstado('rechazada');
+      });
+
+      document.querySelector('.contraofertar-btn')?.addEventListener('click', () => {
+        showContraofertaForm();
+      });
+
+      document.querySelectorAll('.aceptar-contraoferta').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const contraId = (e.currentTarget as HTMLElement).dataset.id;
+          await updateContraofertaEstado(contraId, 'aceptada');
+        });
+      });
+
+      document.querySelectorAll('.rechazar-contraoferta').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const contraId = (e.currentTarget as HTMLElement).dataset.id;
+          await updateContraofertaEstado(contraId, 'rechazada');
+        });
+      });
+    }
+  }
+
+  function showContraofertaForm() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+      <div class="bg-white p-6 rounded-lg w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-4">Contraofertar</h3>
+        <form id="contraoferta-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Tu precio propuesto</label>
+            <input type="number" name="precio_unitario" step="0.01" required class="w-full px-3 py-2 border rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Mensaje</label>
+            <textarea name="mensaje" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="Explica tu contraoferta..."></textarea>
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button type="button" class="cancelar-modal px-4 py-2 border rounded-lg">Cancelar</button>
+            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg">Enviar Contraoferta</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('.cancelar-modal')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('#contraoferta-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target as HTMLFormElement);
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      await supabase.from('contraofertas').insert({
+        oferta_id: ofertaId,
+        cliente_id: user.id,
+        precio_unitario: parseFloat(formData.get('precio_unitario') as string),
+        mensaje: formData.get('mensaje') as string,
+        estado: 'pendiente',
+      });
+
+      await supabase.from('ofertas').update({ estado: 'contraoferta' }).eq('id', ofertaId);
+
+      modal.remove();
+      loadOferta();
+    });
+  }
+
+  async function updateOfertaEstado(estado: string) {
+    await supabase.from('ofertas').update({ estado }).eq('id', ofertaId);
+    loadOferta();
+  }
+
+  async function updateContraofertaEstado(contraId: string, estado: string) {
+    await supabase.from('contraofertas').update({ estado }).eq('id', contraId);
+    loadOferta();
+  }
+
+  function getEstadoColor(estado: string) {
+    const colors: Record<string, string> = {
+      pendiente: 'bg-yellow-100 text-yellow-800',
+      aceptada: 'bg-green-100 text-green-800',
+      rechazada: 'bg-red-100 text-red-800',
+      contraoferta: 'bg-purple-100 text-purple-800',
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  }
+</script>

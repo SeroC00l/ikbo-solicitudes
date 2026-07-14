@@ -1,0 +1,21 @@
+---
+import type { SolicitudEstado, OfertaEstado, ContraofertaEstado } from '@/types';
+import { ESTADO_COLORS } from '@/lib/constants';
+
+interface Props {
+  estado: SolicitudEstado | OfertaEstado | ContraofertaEstado;
+  class?: string;
+}
+
+const { estado, class: className = '' } = Astro.props;
+---
+
+<span
+  class:list={[
+    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+    ESTADO_COLORS[estado] || 'bg-gray-100 text-gray-800',
+    className,
+  ]}
+>
+  {estado.replace('_', ' ').toUpperCase()}
+</span>
