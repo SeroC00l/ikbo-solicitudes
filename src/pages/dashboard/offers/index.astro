@@ -29,8 +29,14 @@ import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
     if (!userStr) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { window.location.href = '/login'; return; }
-      const { data: profile } = await supabase
+      let { data: profile } = await supabase
         .from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
+      if (!profile) {
+        const email = session.user.email || '';
+        await supabase.from('usuarios').insert({ id: session.user.id, email, full_name: email.split('@')[0], empresa: 'My Company', rol: 'comprador' });
+        const { data: p2 } = await supabase.from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
+        profile = p2;
+      }
       if (!profile) { window.location.href = '/login'; return; }
       localStorage.setItem('user', JSON.stringify(profile));
       loadOffers(profile);

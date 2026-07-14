@@ -60,20 +60,31 @@ import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
   import { supabase } from '@/lib/supabase';
   import { escapeHtml } from '@/lib/sanitize';
 
+  async function ensureProfile(userId: string, email: string) {
+    let { data: profile } = await supabase
+      .from('usuarios').select('*').eq('id', userId).maybeSingle();
+    if (!profile) {
+      await supabase.from('usuarios').insert({
+        id: userId,
+        email,
+        full_name: email.split('@')[0],
+        empresa: 'My Company',
+        rol: 'comprador',
+      });
+      const { data: newProfile } = await supabase
+        .from('usuarios').select('*').eq('id', userId).maybeSingle();
+      profile = newProfile;
+    }
+    return profile;
+  }
+
   async function init() {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = '/login';
-        return;
-      }
-      const { data: profile } = await supabase
-        .from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
-      if (!profile) {
-        window.location.href = '/login';
-        return;
-      }
+      if (!session) { window.location.href = '/login'; return; }
+      const profile = await ensureProfile(session.user.id, session.user.email || '');
+      if (!profile) { window.location.href = '/login'; return; }
       localStorage.setItem('user', JSON.stringify(profile));
       renderUser(profile);
     } else {

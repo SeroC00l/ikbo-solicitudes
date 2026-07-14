@@ -55,10 +55,25 @@ import Input from '@/components/ui/Input.astro';
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const { data: profile, error: profileError } = await supabase
+      let { data: profile } = await supabase
         .from('usuarios').select('*').eq('id', data.user.id).maybeSingle();
-      if (profileError) throw profileError;
-      if (!profile) throw new Error('User profile not found');
+
+      if (!profile) {
+        const email = data.user.email || '';
+        const { error: insertError } = await supabase.from('usuarios').insert({
+          id: data.user.id,
+          email,
+          full_name: email.split('@')[0],
+          empresa: 'My Company',
+          rol: 'comprador',
+        });
+        if (insertError) throw insertError;
+
+        const { data: newProfile } = await supabase
+          .from('usuarios').select('*').eq('id', data.user.id).maybeSingle();
+        profile = newProfile;
+      }
+      if (!profile) throw new Error('Could not create user profile');
 
       localStorage.setItem('user', JSON.stringify(profile));
       window.location.href = '/dashboard';
