@@ -20,11 +20,11 @@
 			"dest": "_render"
 		},
 		{
-			"src": "^/dashboard/contratos/([^/]+?)/?$",
+			"src": "^/dashboard/contracts/([^/]+?)/?$",
 			"dest": "_render"
 		},
 		{
-			"src": "^/dashboard/ofertas/([^/]+?)/?$",
+			"src": "^/dashboard/offers/([^/]+?)/?$",
 			"dest": "_render"
 		},
 		{

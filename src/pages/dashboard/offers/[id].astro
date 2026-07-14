@@ -1,0 +1,235 @@
+---
+export const prerender = false;
+
+import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
+
+const { id } = Astro.params;
+---
+
+<LayoutDashboard title="Offer Details">
+  <div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+      <div>
+        <a href="/dashboard/offers" class="text-blue-600 hover:text-blue-800 text-sm">← Back to offers</a>
+        <h1 class="text-3xl font-bold text-gray-900 mt-2">Offer Details</h1>
+      </div>
+    </div>
+
+    <div id="offer-detail" class="bg-white rounded-lg shadow-md p-6">
+      <p class="text-gray-600">Loading details...</p>
+    </div>
+  </div>
+</LayoutDashboard>
+
+<script>
+  import { supabase } from '@/lib/supabase';
+  import { escapeHtml } from '@/lib/sanitize';
+
+  const container = document.getElementById('offer-detail');
+  const urlParts = window.location.pathname.split('/');
+  const offerId = urlParts[urlParts.length - 1];
+
+  if (!offerId) {
+    window.location.href = '/dashboard/offers';
+  } else {
+    loadOffer();
+  }
+
+  async function loadOffer() {
+    // Fetch offer with seller (no nested one-to-many)
+    const { data: offer, error: offerError } = await supabase
+      .from('ofertas')
+      .select('*, vendedor:usuarios(*)')
+      .eq('id', offerId)
+      .single();
+
+    if (offerError || !offer) {
+      if (container) container.innerHTML = `<div class="text-center py-8 text-red-600">Error: ${escapeHtml(offerError?.message || 'Not found')}</div>`;
+      return;
+    }
+
+    // Fetch contract item separately
+    const { data: item } = await supabase
+      .from('contrato_items')
+      .select('*, contrato:contratos(*, comprador:usuarios(*)), flor:flores(*)')
+      .eq('id', offer.contrato_item_id)
+      .single();
+
+    // Fetch counteroffers separately
+    const { data: counteroffers } = await supabase
+      .from('contraofertas')
+      .select('*, comprador:usuarios(*)')
+      .eq('oferta_id', offerId);
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const isSeller = user.id === offer.vendedor_id;
+    const isBuyer = user.id === item?.contrato?.comprador_id;
+
+    if (container) {
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="border-b pb-4">
+            <div class="flex justify-between items-start">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-900">${escapeHtml(item?.flor?.nombre || 'Flower')}</h2>
+                <p class="text-gray-600 mt-1">Contract: ${escapeHtml(item?.contrato?.titulo || 'N/A')}</p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-sm font-medium ${getColor(offer.estado)}">
+                ${escapeHtml(offer.estado.toUpperCase())}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Seller Info</h3>
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-gray-900">${escapeHtml(offer.vendedor?.full_name || 'N/A')}</p>
+                <p class="text-gray-600">${escapeHtml(offer.vendedor?.empresa || 'N/A')}</p>
+                <p class="text-gray-600">${escapeHtml(offer.vendedor?.email || 'N/A')}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">Offer Details</h3>
+              <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                <p><span class="font-medium">Price per Ton:</span> $${offer.precio_por_tonelada}</p>
+                <p><span class="font-medium">Total Price:</span> $${offer.precio_total}</p>
+                <p><span class="font-medium">Delivery Time:</span> ${offer.tiempo_entrega_dias} days</p>
+                <p><span class="font-medium">Conditions:</span> ${escapeHtml(offer.condiciones || 'None')}</p>
+              </div>
+            </div>
+          </div>
+
+          ${counteroffers && counteroffers.length > 0 ? `
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Counteroffers</h3>
+              <div class="space-y-4">
+                ${counteroffers.map((co: any) => `
+                  <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-medium text-gray-900">${escapeHtml(co.comprador?.full_name || 'Buyer')}</p>
+                        <p class="text-lg font-semibold text-purple-700">$${co.precio_por_tonelada}/ton</p>
+                      </div>
+                      <span class="px-2 py-1 text-xs font-medium rounded-full ${getColor(co.estado)}">${escapeHtml(co.estado)}</span>
+                    </div>
+                    ${co.mensaje ? `<p class="text-gray-700 mt-2">${escapeHtml(co.mensaje)}</p>` : ''}
+
+                    ${isSeller && co.estado === 'pendiente' ? `
+                      <div class="mt-3 flex gap-2">
+                        <button class="accept-counter px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700" data-id="${co.id}">Accept</button>
+                        <button class="reject-counter px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700" data-id="${co.id}">Reject</button>
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          ${isBuyer && offer.estado === 'pendiente' ? `
+            <div class="border-t pt-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Buyer Actions</h3>
+              <div class="flex gap-4">
+                <button class="accept-offer px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Accept Offer</button>
+                <button class="reject-offer px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Reject Offer</button>
+                <button class="counteroffer-btn px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Counteroffer</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // Event listeners
+      document.querySelector('.accept-offer')?.addEventListener('click', async () => {
+        await supabase.from('ofertas').update({ estado: 'aceptada' }).eq('id', offerId);
+        // Reject other pending offers for same item
+        await supabase.from('ofertas').update({ estado: 'rechazada' }).eq('contrato_item_id', offer.contrato_item_id).eq('estado', 'pendiente').neq('id', offerId);
+        loadOffer();
+      });
+
+      document.querySelector('.reject-offer')?.addEventListener('click', async () => {
+        await supabase.from('ofertas').update({ estado: 'rechazada' }).eq('id', offerId);
+        loadOffer();
+      });
+
+      document.querySelector('.counteroffer-btn')?.addEventListener('click', () => {
+        showCounterofferModal();
+      });
+
+      document.querySelectorAll('.accept-counter').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const coId = (e.currentTarget as HTMLElement).dataset.id!;
+          await supabase.from('contraofertas').update({ estado: 'aceptada' }).eq('id', coId);
+          // Update parent offer to accepted as well
+          await supabase.from('ofertas').update({ estado: 'aceptada' }).eq('id', offerId);
+          loadOffer();
+        });
+      });
+
+      document.querySelectorAll('.reject-counter').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const coId = (e.currentTarget as HTMLElement).dataset.id!;
+          await supabase.from('contraofertas').update({ estado: 'rechazada' }).eq('id', coId);
+          loadOffer();
+        });
+      });
+    }
+  }
+
+  function showCounterofferModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+      <div class="bg-white p-6 rounded-lg w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-4">Counteroffer</h3>
+        <form id="counter-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Your price per ton</label>
+            <input type="number" name="precio_unitario" step="0.01" required class="w-full px-3 py-2 border rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Message</label>
+            <textarea name="mensaje" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="Explain your counteroffer..."></textarea>
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button type="button" class="cancel-modal px-4 py-2 border rounded-lg">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg">Submit</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('.cancel-modal')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('#counter-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target as HTMLFormElement);
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+      await supabase.from('contraofertas').insert({
+        oferta_id: offerId,
+        comprador_id: user.id,
+        precio_por_tonelada: parseFloat(formData.get('precio_unitario') as string),
+        mensaje: formData.get('mensaje') as string || null,
+        estado: 'pendiente',
+      });
+
+      await supabase.from('ofertas').update({ estado: 'contraoferta' }).eq('id', offerId);
+
+      modal.remove();
+      loadOffer();
+    });
+  }
+
+  function getColor(estado: string) {
+    const colors: Record<string, string> = {
+      pendiente: 'bg-yellow-100 text-yellow-800',
+      aceptada: 'bg-green-100 text-green-800',
+      rechazada: 'bg-red-100 text-red-800',
+      contraoferta: 'bg-purple-100 text-purple-800',
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  }
+</script>

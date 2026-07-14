@@ -14,67 +14,67 @@ export type TipoFlor = 'rosa' | 'clavel' | 'lirio' | 'gerbera' | 'crisantemo' | 
 export interface Flor {
   id: string;
   nombre: string;
-  tipo: TipoFlor;
+  tipo: string;
   color: string;
   origen: string;
   vida_util_dias: number;
   created_at: string;
 }
 
-export type ContratoEstado = 'pendiente' | 'aceptado' | 'en_proceso' | 'completado' | 'cancelado' | 'vencido';
+export type ContractEstado = 'pendiente' | 'aceptado' | 'en_proceso' | 'completado' | 'cancelado' | 'vencido';
 
-export interface Contrato {
+export interface Contract {
   id: string;
   comprador_id: string;
   titulo: string;
   descripcion: string;
-  estado: ContratoEstado;
+  estado: ContractEstado;
   fecha_entrega: string;
-  precio_total: number;
+  precio_total: number | null;
   created_at: string;
   comprador?: User;
-  items?: ContratoItem[];
+  items?: ContractItem[];
 }
 
-export interface ContratoItem {
+export interface ContractItem {
   id: string;
   contrato_id: string;
   flor_id: string;
   toneladas: number;
   precio_por_tonelada: number;
-  especificaciones: string;
+  especificaciones: string | null;
   created_at: string;
   flor?: Flor;
-  ofertas?: Oferta[];
+  offers?: Offer[];
 }
 
-export type OfertaEstado = 'pendiente' | 'aceptada' | 'rechazada' | 'contraoferta';
+export type OfferEstado = 'pendiente' | 'aceptada' | 'rechazada' | 'contraoferta';
 
-export interface Oferta {
+export interface Offer {
   id: string;
   contrato_item_id: string;
   vendedor_id: string;
   precio_por_tonelada: number;
   precio_total: number;
   tiempo_entrega_dias: number;
-  condiciones: string;
-  estado: OfertaEstado;
+  condiciones: string | null;
+  estado: OfferEstado;
   created_at: string;
   vendedor?: User;
-  contrato_item?: ContratoItem;
-  contraofertas?: Contraoferta[];
+  contrato_item?: ContractItem;
+  contraofertas?: Counteroffer[];
 }
 
-export type ContraofertaEstado = 'pendiente' | 'aceptada' | 'rechazada';
+export type CounterofferEstado = 'pendiente' | 'aceptada' | 'rechazada';
 
-export interface Contraoferta {
+export interface Counteroffer {
   id: string;
   oferta_id: string;
   comprador_id: string;
   precio_por_tonelada: number;
-  mensaje: string;
-  estado: ContraofertaEstado;
+  mensaje: string | null;
+  estado: CounterofferEstado;
   created_at: string;
   comprador?: User;
-  oferta?: Oferta;
+  oferta?: Offer;
 }

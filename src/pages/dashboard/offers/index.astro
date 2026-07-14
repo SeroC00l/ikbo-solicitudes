@@ -1,0 +1,119 @@
+---
+import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
+---
+
+<LayoutDashboard title="Offers">
+  <div class="space-y-6">
+    <div class="flex items-center gap-4">
+      <span class="text-3xl">💰</span>
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">Offers</h1>
+        <p class="mt-2 text-gray-600">Manage flower seller offers</p>
+      </div>
+    </div>
+
+    <div id="offers-container" class="bg-white rounded-lg shadow-md">
+      <div class="p-6 text-center text-gray-600">Loading offers...</div>
+    </div>
+  </div>
+</LayoutDashboard>
+
+<script>
+  import { supabase } from '@/lib/supabase';
+  import { escapeHtml } from '@/lib/sanitize';
+
+  const container = document.getElementById('offers-container');
+
+  async function init() {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = '/login'; return; }
+      const { data: profile } = await supabase
+        .from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
+      if (!profile) { window.location.href = '/login'; return; }
+      localStorage.setItem('user', JSON.stringify(profile));
+      loadOffers(profile);
+    } else {
+      loadOffers(JSON.parse(userStr));
+    }
+  }
+
+  async function loadOffers(user: any) {
+    let query = supabase
+      .from('ofertas')
+      .select('*, vendedor:usuarios(*), contrato_item:contrato_items(*, contrato:contratos(*), flor:flores(*)), contraofertas(*, comprador:usuarios(*))')
+      .order('created_at', { ascending: false });
+
+    if (user.rol === 'vendedor') {
+      query = query.eq('vendedor_id', user.id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      if (container) container.innerHTML = `<div class="p-6 text-center text-red-600">Error: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      if (container) container.innerHTML = `<div class="p-6 text-center text-gray-600">No offers available.</div>`;
+      return;
+    }
+
+    if (container) {
+      container.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flower</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Seller</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              ${data.map(o => `
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${escapeHtml(o.contrato_item?.flor?.nombre || 'N/A')}</div>
+                    <div class="text-sm text-gray-500">${escapeHtml(o.contrato_item?.contrato?.titulo || '')}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${escapeHtml(o.vendedor?.full_name || 'N/A')}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">$${o.precio_por_tonelada}/ton</div>
+                    <div class="text-sm text-gray-500">Total: $${o.precio_total}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getColor(o.estado)}">
+                      ${escapeHtml(o.estado)}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <a href="/dashboard/offers/${o.id}" class="text-blue-600 hover:text-blue-900">View</a>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+  }
+
+  function getColor(estado: string) {
+    const colors: Record<string, string> = {
+      pendiente: 'bg-yellow-100 text-yellow-800',
+      aceptada: 'bg-green-100 text-green-800',
+      rechazada: 'bg-red-100 text-red-800',
+      contraoferta: 'bg-purple-100 text-purple-800',
+    };
+    return colors[estado] || 'bg-gray-100 text-gray-800';
+  }
+
+  init();
+</script>

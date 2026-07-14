@@ -1,4 +1,4 @@
-import type { UserRole, ContratoEstado, OfertaEstado, ContraofertaEstado } from './index';
+import type { UserRole, ContractEstado, OfferEstado, CounterofferEstado } from './index';
 
 export interface Database {
   public: {
@@ -64,9 +64,9 @@ export interface Database {
           comprador_id: string;
           titulo: string;
           descripcion: string;
-          estado: ContratoEstado;
+          estado: ContractEstado;
           fecha_entrega: string;
-          precio_total: number;
+          precio_total: number | null;
           created_at: string;
         };
         Insert: {
@@ -74,7 +74,7 @@ export interface Database {
           comprador_id: string;
           titulo: string;
           descripcion: string;
-          estado?: ContratoEstado;
+          estado?: ContractEstado;
           fecha_entrega: string;
           precio_total?: number;
           created_at?: string;
@@ -84,7 +84,7 @@ export interface Database {
           comprador_id?: string;
           titulo?: string;
           descripcion?: string;
-          estado?: ContratoEstado;
+          estado?: ContractEstado;
           fecha_entrega?: string;
           precio_total?: number;
           created_at?: string;
@@ -97,7 +97,7 @@ export interface Database {
           flor_id: string;
           toneladas: number;
           precio_por_tonelada: number;
-          especificaciones: string;
+          especificaciones: string | null;
           created_at: string;
         };
         Insert: {
@@ -106,7 +106,7 @@ export interface Database {
           flor_id: string;
           toneladas: number;
           precio_por_tonelada: number;
-          especificaciones: string;
+          especificaciones?: string;
           created_at?: string;
         };
         Update: {
@@ -127,8 +127,8 @@ export interface Database {
           precio_por_tonelada: number;
           precio_total: number;
           tiempo_entrega_dias: number;
-          condiciones: string;
-          estado: OfertaEstado;
+          condiciones: string | null;
+          estado: OfferEstado;
           created_at: string;
         };
         Insert: {
@@ -138,8 +138,8 @@ export interface Database {
           precio_por_tonelada: number;
           precio_total: number;
           tiempo_entrega_dias: number;
-          condiciones: string;
-          estado?: OfertaEstado;
+          condiciones?: string;
+          estado?: OfferEstado;
           created_at?: string;
         };
         Update: {
@@ -150,7 +150,7 @@ export interface Database {
           precio_total?: number;
           tiempo_entrega_dias?: number;
           condiciones?: string;
-          estado?: OfertaEstado;
+          estado?: OfferEstado;
           created_at?: string;
         };
       };
@@ -160,8 +160,8 @@ export interface Database {
           oferta_id: string;
           comprador_id: string;
           precio_por_tonelada: number;
-          mensaje: string;
-          estado: ContraofertaEstado;
+          mensaje: string | null;
+          estado: CounterofferEstado;
           created_at: string;
         };
         Insert: {
@@ -169,8 +169,8 @@ export interface Database {
           oferta_id: string;
           comprador_id: string;
           precio_por_tonelada: number;
-          mensaje: string;
-          estado?: ContraofertaEstado;
+          mensaje?: string;
+          estado?: CounterofferEstado;
           created_at?: string;
         };
         Update: {
@@ -179,16 +179,16 @@ export interface Database {
           comprador_id?: string;
           precio_por_tonelada?: number;
           mensaje?: string;
-          estado?: ContraofertaEstado;
+          estado?: CounterofferEstado;
           created_at?: string;
         };
       };
     };
     Enums: {
       user_role: UserRole;
-      contrato_estado: ContratoEstado;
-      oferta_estado: OfertaEstado;
-      contraoferta_estado: ContraofertaEstado;
+      contrato_estado: ContractEstado;
+      oferta_estado: OfferEstado;
+      contraoferta_estado: CounterofferEstado;
     };
   };
 }

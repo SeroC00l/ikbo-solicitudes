@@ -5,29 +5,29 @@ import Input from '@/components/ui/Input.astro';
 
 <form id="register-form" class="space-y-6">
   <Input
-    label="Nombre Completo"
+    label="Full Name"
     name="fullName"
     required
-    placeholder="Juan Pérez"
+    placeholder="John Doe"
   />
 
   <Input
-    label="Empresa"
+    label="Company"
     name="empresa"
     required
-    placeholder="Flores del Valle S.A."
+    placeholder="Fresh Flowers Inc."
   />
 
   <Input
-    label="Correo Electrónico"
+    label="Email"
     name="email"
     type="email"
     required
-    placeholder="tu@ejemplo.com"
+    placeholder="you@example.com"
   />
 
   <Input
-    label="Contraseña"
+    label="Password"
     name="password"
     type="password"
     required
@@ -35,27 +35,27 @@ import Input from '@/components/ui/Input.astro';
   />
 
   <div class="space-y-2">
-    <label class="block text-sm font-medium text-gray-700">Rol</label>
+    <label class="block text-sm font-medium text-gray-700">Role</label>
     <div class="grid grid-cols-3 gap-3">
       <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
         <input type="radio" name="rol" value="comprador" class="sr-only" checked />
         <div class="text-center">
           <span class="text-2xl">🛒</span>
-          <span class="mt-1 block text-sm font-medium">Comprador</span>
+          <span class="mt-1 block text-sm font-medium">Buyer</span>
         </div>
       </label>
       <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
         <input type="radio" name="rol" value="vendedor" class="sr-only" />
         <div class="text-center">
           <span class="text-2xl">🌾</span>
-          <span class="mt-1 block text-sm font-medium">Vendedor</span>
+          <span class="mt-1 block text-sm font-medium">Seller</span>
         </div>
       </label>
       <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
         <input type="radio" name="rol" value="ambos" class="sr-only" />
         <div class="text-center">
           <span class="text-2xl">🤝</span>
-          <span class="mt-1 block text-sm font-medium">Ambos</span>
+          <span class="mt-1 block text-sm font-medium">Both</span>
         </div>
       </label>
     </div>
@@ -64,13 +64,13 @@ import Input from '@/components/ui/Input.astro';
   <div id="error-message" class="hidden text-sm text-red-600 bg-red-50 p-3 rounded-lg"></div>
 
   <Button type="submit" class="w-full" id="register-btn">
-    Crear Cuenta
+    Create Account
   </Button>
 
   <p class="text-center text-sm text-gray-600">
-    ¿Ya tienes una cuenta?
+    Already have an account?
     <a href="/login" class="font-medium text-pink-600 hover:text-pink-500">
-      Inicia sesión
+      Sign in
     </a>
   </p>
 </form>
@@ -84,7 +84,7 @@ import Input from '@/components/ui/Input.astro';
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const formData = new FormData(form);
     const fullName = formData.get('fullName') as string;
     const empresa = formData.get('empresa') as string;
@@ -92,15 +92,19 @@ import Input from '@/components/ui/Input.astro';
     const password = formData.get('password') as string;
     const rol = formData.get('rol') as string;
 
+    if (password.length < 6) {
+      if (errorDiv) {
+        errorDiv.textContent = 'Password must be at least 6 characters';
+        errorDiv.classList.remove('hidden');
+      }
+      return;
+    }
+
     if (errorDiv) errorDiv.classList.add('hidden');
     if (registerBtn) registerBtn.setAttribute('disabled', 'true');
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
 
       const { error: profileError } = await supabase.from('usuarios').insert({
@@ -110,10 +114,9 @@ import Input from '@/components/ui/Input.astro';
         empresa,
         rol: rol as any,
       });
-
       if (profileError) throw profileError;
 
-      alert('Cuenta creada exitosamente. Por favor inicia sesión.');
+      alert('Account created successfully. Please sign in.');
       window.location.href = '/login';
     } catch (error) {
       if (errorDiv) {

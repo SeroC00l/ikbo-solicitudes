@@ -21,22 +21,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   signIn: async (email, password) => {
     try {
       set({ loading: true, error: null });
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const { data: userProfile, error: profileError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
+      const { data: profile, error: profileError } = await supabase
+        .from('usuarios').select('*').eq('id', data.user.id).maybeSingle();
       if (profileError) throw profileError;
+      if (!profile) throw new Error('User profile not found');
 
-      set({ user: userProfile, loading: false });
+      set({ user: profile, loading: false });
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
     }
@@ -45,11 +38,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   signUp: async (email, password, fullName, empresa, rol) => {
     try {
       set({ loading: true, error: null });
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
 
       const { error: profileError } = await supabase.from('usuarios').insert({
@@ -59,7 +48,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         empresa,
         rol,
       });
-
       if (profileError) throw profileError;
 
       set({ loading: false });
@@ -73,6 +61,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: true, error: null });
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      localStorage.removeItem('user');
       set({ user: null, loading: false });
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
@@ -83,21 +72,21 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       set({ loading: true, error: null });
       const { data: { session } } = await supabase.auth.getSession();
-
       if (!session) {
         set({ user: null, loading: false });
         return;
       }
 
-      const { data: userProfile, error: profileError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
+      const { data: profile, error: profileError } = await supabase
+        .from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
       if (profileError) throw profileError;
+      if (!profile) {
+        set({ user: null, loading: false });
+        return;
+      }
 
-      set({ user: userProfile, loading: false });
+      localStorage.setItem('user', JSON.stringify(profile));
+      set({ user: profile, loading: false });
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
     }

@@ -20,8 +20,11 @@ DO $$ BEGIN
   DROP POLICY IF EXISTS "contratos_select_involved" ON contratos;
   DROP POLICY IF EXISTS "contratos_insert_comprador" ON contratos;
   DROP POLICY IF EXISTS "contratos_update_owner" ON contratos;
+  DROP POLICY IF EXISTS "contratos_delete_owner" ON contratos;
   DROP POLICY IF EXISTS "contrato_items_select_contrato" ON contrato_items;
   DROP POLICY IF EXISTS "contrato_items_insert_comprador" ON contrato_items;
+  DROP POLICY IF EXISTS "contrato_items_update_comprador" ON contrato_items;
+  DROP POLICY IF EXISTS "contrato_items_delete_comprador" ON contrato_items;
   DROP POLICY IF EXISTS "ofertas_select_involved" ON ofertas;
   DROP POLICY IF EXISTS "ofertas_insert_vendedor" ON ofertas;
   DROP POLICY IF EXISTS "ofertas_update_vendedor" ON ofertas;
@@ -50,7 +53,7 @@ CREATE POLICY "flores_select_public" ON flores
   FOR SELECT USING (true);
 
 CREATE POLICY "flores_insert_authenticated" ON flores
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Contratos policies
 CREATE POLICY "contratos_select_involved" ON contratos
@@ -72,8 +75,11 @@ CREATE POLICY "contratos_insert_comprador" ON contratos
   );
 
 CREATE POLICY "contratos_update_owner" ON contratos
-  FOR UPDATE USING (
-    comprador_id = auth.uid()
+  FOR UPDATE USING (comprador_id = auth.uid());
+
+CREATE POLICY "contratos_delete_owner" ON contratos
+  FOR DELETE USING (
+    comprador_id = auth.uid() AND estado = 'pendiente'
   );
 
 -- Contrato Items policies
@@ -94,6 +100,24 @@ CREATE POLICY "contrato_items_select_contrato" ON contrato_items
 
 CREATE POLICY "contrato_items_insert_comprador" ON contrato_items
   FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM contratos
+      WHERE id = contrato_items.contrato_id
+      AND comprador_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "contrato_items_update_comprador" ON contrato_items
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM contratos
+      WHERE id = contrato_items.contrato_id
+      AND comprador_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "contrato_items_delete_comprador" ON contrato_items
+  FOR DELETE USING (
     EXISTS (
       SELECT 1 FROM contratos
       WHERE id = contrato_items.contrato_id
@@ -123,9 +147,7 @@ CREATE POLICY "ofertas_insert_vendedor" ON ofertas
   );
 
 CREATE POLICY "ofertas_update_vendedor" ON ofertas
-  FOR UPDATE USING (
-    vendedor_id = auth.uid()
-  );
+  FOR UPDATE USING (vendedor_id = auth.uid());
 
 CREATE POLICY "ofertas_update_comprador" ON ofertas
   FOR UPDATE USING (
