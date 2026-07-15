@@ -46,7 +46,7 @@ import { supabase } from '@/lib/supabase';
 ### 1. Clonar el repositorio
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/SeroC00l/ikbo-solicitudes
 cd ikbo-solicitudes
 ```
 
