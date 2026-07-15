@@ -57,7 +57,11 @@ function isActive(href: string): boolean {
   import { supabase } from '@/lib/supabase';
 
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // signOut may fail if session is invalid; still proceed
+    }
     localStorage.removeItem('user');
     window.location.href = '/login';
   });

@@ -6,6 +6,7 @@ interface Props {
   disabled?: boolean;
   loading?: boolean;
   class?: string;
+  id?: string;
 }
 
 const {
@@ -15,6 +16,7 @@ const {
   disabled = false,
   loading = false,
   class: className = '',
+  id,
 } = Astro.props;
 
 const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
@@ -35,6 +37,7 @@ const sizes = {
 
 <button
   type={type}
+  id={id}
   disabled={disabled || loading}
   class:list={[baseStyles, variants[variant], sizes[size], className]}
 >
