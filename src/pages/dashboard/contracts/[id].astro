@@ -24,10 +24,12 @@ const { id } = Astro.params;
 <script>
   import { supabase } from '@/lib/supabase';
   import { escapeHtml } from '@/lib/sanitize';
+  import { getCurrentUser } from '@/lib/auth';
 
   const container = document.getElementById('contract-detail');
   const urlParts = window.location.pathname.split('/');
   const contractId = urlParts[urlParts.length - 1];
+  let currentUser: Awaited<ReturnType<typeof getCurrentUser>> = null;
 
   if (!contractId) {
     window.location.href = '/dashboard/contracts';
@@ -36,6 +38,10 @@ const { id } = Astro.params;
   }
 
   async function loadContract() {
+    if (!currentUser) {
+      currentUser = await getCurrentUser();
+      if (!currentUser) { window.location.href = '/login'; return; }
+    }
     // Fetch contract with buyer (single row, no one-to-many join)
     const { data: contract, error: contractError } = await supabase
       .from('contratos')
@@ -87,9 +93,9 @@ const { id } = Astro.params;
     }
     contract.items = items || [];
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const isOwner = user.id === contract.comprador_id;
-    const isSeller = user.rol === 'vendedor' || user.rol === 'ambos';
+    const user = currentUser;
+    const isOwner = user?.id === contract.comprador_id;
+    const isSeller = user?.rol === 'vendedor' || user?.rol === 'ambos';
 
     if (container) {
       container.innerHTML = `
@@ -256,12 +262,12 @@ const { id } = Astro.params;
     modal.querySelector('#offer-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target as HTMLFormElement);
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!currentUser) return;
       const precio = parseFloat(formData.get('precio_unitario') as string);
 
       await supabase.from('ofertas').insert({
         contrato_item_id: itemId,
-        vendedor_id: user.id,
+        vendedor_id: currentUser!.id,
         precio_por_tonelada: precio,
         precio_total: precio * parseFloat(toneladas),
         tiempo_entrega_dias: parseInt(formData.get('tiempo_entrega') as string),
@@ -302,11 +308,11 @@ const { id } = Astro.params;
     modal.querySelector('#counter-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target as HTMLFormElement);
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!currentUser) return;
 
       await supabase.from('contraofertas').insert({
         oferta_id: ofertaId,
-        comprador_id: user.id,
+        comprador_id: currentUser.id,
         precio_por_tonelada: parseFloat(formData.get('precio_unitario') as string),
         mensaje: formData.get('mensaje') as string || null,
         estado: 'pendiente',

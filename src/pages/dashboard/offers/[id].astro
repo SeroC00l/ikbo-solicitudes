@@ -24,10 +24,12 @@ const { id } = Astro.params;
 <script>
   import { supabase } from '@/lib/supabase';
   import { escapeHtml } from '@/lib/sanitize';
+  import { getCurrentUser } from '@/lib/auth';
 
   const container = document.getElementById('offer-detail');
   const urlParts = window.location.pathname.split('/');
   const offerId = urlParts[urlParts.length - 1];
+  let currentUser: Awaited<ReturnType<typeof getCurrentUser>> = null;
 
   if (!offerId) {
     window.location.href = '/dashboard/offers';
@@ -36,6 +38,10 @@ const { id } = Astro.params;
   }
 
   async function loadOffer() {
+    if (!currentUser) {
+      currentUser = await getCurrentUser();
+      if (!currentUser) { window.location.href = '/login'; return; }
+    }
     // Fetch offer with seller (no nested one-to-many)
     const { data: offer, error: offerError } = await supabase
       .from('ofertas')
@@ -61,9 +67,9 @@ const { id } = Astro.params;
       .select('*, comprador:usuarios(*)')
       .eq('oferta_id', offerId);
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const isSeller = user.id === offer.vendedor_id;
-    const isBuyer = user.id === item?.contrato?.comprador_id;
+    const user = currentUser;
+    const isSeller = user?.id === offer.vendedor_id;
+    const isBuyer = user?.id === item?.contrato?.comprador_id;
 
     if (container) {
       container.innerHTML = `
@@ -206,11 +212,11 @@ const { id } = Astro.params;
     modal.querySelector('#counter-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target as HTMLFormElement);
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!currentUser) return;
 
       await supabase.from('contraofertas').insert({
         oferta_id: offerId,
-        comprador_id: user.id,
+        comprador_id: currentUser.id,
         precio_por_tonelada: parseFloat(formData.get('precio_unitario') as string),
         mensaje: formData.get('mensaje') as string || null,
         estado: 'pendiente',

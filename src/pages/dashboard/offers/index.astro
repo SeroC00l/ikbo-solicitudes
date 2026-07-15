@@ -21,28 +21,14 @@ import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
 <script>
   import { supabase } from '@/lib/supabase';
   import { escapeHtml } from '@/lib/sanitize';
+  import { getCurrentUser } from '@/lib/auth';
 
   const container = document.getElementById('offers-container');
 
   async function init() {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { window.location.href = '/login'; return; }
-      let { data: profile } = await supabase
-        .from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
-      if (!profile) {
-        const email = session.user.email || '';
-        await supabase.from('usuarios').insert({ id: session.user.id, email, full_name: email.split('@')[0], empresa: 'My Company', rol: 'comprador' });
-        const { data: p2 } = await supabase.from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
-        profile = p2;
-      }
-      if (!profile) { window.location.href = '/login'; return; }
-      localStorage.setItem('user', JSON.stringify(profile));
-      loadOffers(profile);
-    } else {
-      loadOffers(JSON.parse(userStr));
-    }
+    const user = await getCurrentUser();
+    if (!user) { window.location.href = '/login'; return; }
+    loadOffers(user);
   }
 
   async function loadOffers(user: any) {

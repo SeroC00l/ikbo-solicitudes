@@ -59,37 +59,12 @@ import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
 <script>
   import { supabase } from '@/lib/supabase';
   import { escapeHtml } from '@/lib/sanitize';
-
-  async function ensureProfile(userId: string, email: string) {
-    let { data: profile } = await supabase
-      .from('usuarios').select('*').eq('id', userId).maybeSingle();
-    if (!profile) {
-      await supabase.from('usuarios').insert({
-        id: userId,
-        email,
-        full_name: email.split('@')[0],
-        empresa: 'My Company',
-        rol: 'comprador',
-      });
-      const { data: newProfile } = await supabase
-        .from('usuarios').select('*').eq('id', userId).maybeSingle();
-      profile = newProfile;
-    }
-    return profile;
-  }
+  import { getCurrentUser } from '@/lib/auth';
 
   async function init() {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { window.location.href = '/login'; return; }
-      const profile = await ensureProfile(session.user.id, session.user.email || '');
-      if (!profile) { window.location.href = '/login'; return; }
-      localStorage.setItem('user', JSON.stringify(profile));
-      renderUser(profile);
-    } else {
-      renderUser(JSON.parse(userStr));
-    }
+    const user = await getCurrentUser();
+    if (!user) { window.location.href = '/login'; return; }
+    renderUser(user);
   }
 
   function renderUser(user: any) {
