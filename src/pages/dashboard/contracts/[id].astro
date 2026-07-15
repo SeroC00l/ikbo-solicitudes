@@ -1,7 +1,9 @@
 ---
-export const prerender = false;
-
 import LayoutDashboard from '@/layouts/LayoutDashboard.astro';
+
+export function getStaticPaths() {
+  return [{ params: { id: '__placeholder__' } }];
+}
 
 const { id } = Astro.params;
 ---

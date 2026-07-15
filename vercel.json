@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/dashboard/contracts/:id",
+      "destination": "/dashboard/contracts/__placeholder__/index.html"
+    },
+    {
+      "source": "/dashboard/offers/:id",
+      "destination": "/dashboard/offers/__placeholder__/index.html"
+    }
+  ]
+}
