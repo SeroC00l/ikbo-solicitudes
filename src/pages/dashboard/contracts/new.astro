@@ -75,12 +75,35 @@ import Textarea from '@/components/ui/Textarea.astro';
   let items: Array<{ florId: string; toneladas: number; precioPorTonelada: number; especificaciones: string }> = [];
   let flores: Array<{ id: string; nombre: string; tipo: string }> = [];
 
+  async function ensureProfile() {
+    let userStr = localStorage.getItem('user');
+    if (userStr) return JSON.parse(userStr);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { window.location.href = '/login'; return null; }
+
+    let { data: profile } = await supabase
+      .from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
+    if (!profile) {
+      const email = session.user.email || '';
+      await supabase.from('usuarios').insert({
+        id: session.user.id, email, full_name: email.split('@')[0],
+        empresa: 'My Company', rol: 'comprador',
+      });
+      const { data: p2 } = await supabase.from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
+      profile = p2;
+    }
+    if (!profile) { window.location.href = '/login'; return null; }
+    localStorage.setItem('user', JSON.stringify(profile));
+    return profile;
+  }
+
   async function loadFlores() {
     const { data } = await supabase.from('flores').select('*').order('nombre');
     if (data) { flores = data; renderItems(); }
   }
 
-  loadFlores();
+  ensureProfile().then(() => loadFlores());
 
   addItemBtn?.addEventListener('click', () => {
     items.push({ florId: '', toneladas: 1, precioPorTonelada: 0, especificaciones: '' });
