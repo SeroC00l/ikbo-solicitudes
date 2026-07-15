@@ -7,7 +7,7 @@
 | Rol | Perfil | Responsabilidades principales |
 |-----|--------|-------------------------------|
 | **Tech Lead / Fullstack Senior** | Experto en arquitectura, React, Node.js, DevOps | Arquitectura del sistema, code review, CI/CD, K8s deployment |
-| **Fullstack Junior** | React, backend básico, aprendizaje rápido | Componentes UI, formularios, integrações con API, tests |
+| **Fullstack Junior** | React, backend básico, aprendizaje rápido | Componentes UI, formularios, integraciones con API, tests |
 | **Backend Developer** | NestJS, PostgreSQL, microservicios | API REST, lógica de negocio, microservicios, migración desde Supabase |
 
 ### Distribución de Conocimiento
