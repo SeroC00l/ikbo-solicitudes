@@ -3,6 +3,7 @@
 ## Descripción
 
 Plataforma web para gestionar contratos de futuros de flores premium, conectando compradores y vendedores para acordar precios y cantidades de toneladas de flores frescas.
+NOTA: El pryecto esta desplegado y puedes probarlo directamente en https://ikbo-solicitudes.vercel.app/
 
 ## Características
 
