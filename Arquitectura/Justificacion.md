@@ -1,173 +1,355 @@
 # Justificación de Decisiones Técnicas - FlorFutures
 
-## 1. ¿Por qué elegí la estructura arquitectónica propuesta?
+## 1. Arquitectura del Sistema
 
-### Arquitectura JAMstack/Serverless
+### Arquitectura General
 
-Elegí una arquitectura **JAMstack** (JavaScript, APIs, Markup) con **Serverless** para el sistema de contratos de futuros de flores por las siguientes razones:
+FlorFutures sigue una arquitectura **frontend-first** con separación clara de responsabilidades:
 
-1. **Rendimiento**: Astro genera HTML estático que se carga rápidamente, mientras que React maneja las partes interactivas (Islands Architecture).
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        CLIENT (Browser)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
+│  │   Astro SSG  │  │ React Islands│  │     Zustand Store     │ │
+│  │  (Shell HTML)│  │ (Interactive)│  │   (Client State)      │ │
+│  └──────────────┘  └──────────────┘  └───────────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ HTTPS
+┌─────────────────────────────┴───────────────────────────────────┐
+│                     AWS Cloud (EKS Cluster)                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
+│  │  Astro/React │  │  NestJS API  │  │  Notification Service │ │
+│  │  (Ingress)   │  │  (Deployment)│  │  (Event-driven)       │ │
+│  └──────────────┘  └──────┬───────┘  └───────────┬───────────┘ │
+│                           │                      │              │
+│  ┌────────────────────────┴──────────────────────┴───────────┐ │
+│  │                    Service Mesh (Istio)                    │ │
+│  └────────────────────────┬──────────────────────┬───────────┘ │
+│                           │                      │              │
+│  ┌────────────────────────┴──────┐  ┌────────────┴───────────┐ │
+│  │    PostgreSQL (RDS)           │  │    Redis (ElastiCache) │ │
+│  │    + Supabase Auth            │  │    (Session/Cache)     │ │
+│  └───────────────────────────────┘  └────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-2. **Escalabilidad**: Supabase maneja automáticamente el escalado de la base de datos y la autenticación, sin necesidad de gestionar servidores.
+### Justificación de Astro + React
 
-3. **Costo-efectividad**: Vercel y Supabase tienen planes gratuitos generosos para proyectos en etapa de desarrollo.
+**Astro** como framework principal:
 
-4. **Mantenibilidad**: La separación clara entre frontend (Astro) y backend (Supabase) facilita el desarrollo y debugging.
+1. **Islands Architecture**: Solo las partes interactivas cargan JavaScript (formularios, modales, dashboards)
+2. **Performance**: HTML estático servido desde CDN, First Contentful Paint < 1s
+3. **SEO**: Rendering del lado del servidor para contenido indexable
+4. **Bundle mínimo**: 0kb de JavaScript por defecto, solo lo necesario se hidrata
 
-### Modularidad del Backend
+**React** para componentes interactivos:
+- Formularios dinámicos (contract creation, offer modals)
+- Estados reactivos (listas filtradas, counts en tiempo real)
+- Componentes reutilizables con composición
 
-Diseñé el backend con una arquitectura modular que permite migrar fácilmente a NestJS si se necesita:
+**Zustand** para estado del cliente:
+- Store ligero (~1kb) comparado con Redux (~11kb)
+- Sin boilerplate, sin providers
+- Persistencia opcional con localStorage
 
-- **Capa de datos**: Supabase PostgreSQL con RLS
-- **Capa de autenticación**: Supabase Auth
-- **Capa de API**: Auto-generada por Supabase
+## 2. Seguridad
 
-Esta separación permite reemplazar Supabase por NestJS sin modificar el frontend significativamente.
+### Autenticación y Autorización
 
-### Alias de Importación con `@`
+**Capa 1 - JWT (Supabase Auth)**:
+- Tokens firmados con HMAC-SHA256
+- Expiración configurable (default 1 hora)
+- Refresh tokens para sesiones largas
 
-Configuré alias de importación con `@` para mejorar la mantenibilidad:
+**Capa 2 - Row Level Security (RLS)**:
+```sql
+-- Cada consulta pasa por estas políticas
+-- SELECT: Solo ven datos que les pertenecen
+-- INSERT: Solo crean con su propio ID
+-- UPDATE: Solo modifican sus propios registros
+-- DELETE: Solo eliminan en estado pendiente
+```
+
+**Capa 3 - Frontend Guards**:
+- Verificación de sesión en cada navegación
+- Redirección automática a login si no hay sesión
+- Creación automática de perfil si falta (safety net)
+
+### Flujos de Seguridad
+
+```
+Login → JWT → Supabase Client → RLS Check → Data
+              ↓
+         localStorage (perfil cache)
+              ↓
+         Session Validate (on each page)
+              ↓
+         getCurrentUser() → Supabase Auth Session
+```
+
+### Por qué `getCurrentUser()` en vez de localStorage puro
+
+El sistema valida la sesión **siempre** contra Supabase Auth, no solo contra localStorage:
 
 ```typescript
-// tsconfig.json
+// Antes (inseguro - localStorage puede tener datos obsoletos)
+const user = JSON.parse(localStorage.getItem('user'));
+
+// Después (seguro - siempre valida contra la sesión activa)
+const user = await getCurrentUser(); // → supabase.auth.getSession() → usuarios table
+```
+
+Esto previene:
+- UUIDs obsoletos después de recrear usuarios
+- Sesiones expiradas que parecen válidas
+- Datos de cache desincronizados
+
+## 3. Escalabilidad con Kubernetes + AWS
+
+### Por qué Kubernetes
+
+1. **Auto-escalado**: HPA (Horizontal Pod Autoscaler) escala pods según CPU/memory
+2. **Disponibilidad**: Múltiples répicas toleran fallos de nodos
+3. **Rolling updates**: Deployments sin downtime
+4. **Service discovery**: Comunicación interna entre microservicios
+5. **Secrets management**: Variables sensibles en K8s Secrets
+
+### Por qué AWS
+
+1. **EKS**: Managed Kubernetes, sin gestionar masters
+2. **RDS**: PostgreSQL managed con backups automáticos y Multi-AZ
+3. **ElastiCache**: Redis para caché de sesiones y rate limiting
+4. **ALB**: Load balancer con SSL termination
+5. **ECR**: Container registry privado
+6. **CloudWatch**: Monitoreo y alertas integradas
+
+### Arquitectura de Deploy
+
+```
+                    ┌──────────────────┐
+                    │   Route 53 DNS   │
+                    └────────┬─────────┘
+                             │
+                    ┌────────┴─────────┐
+                    │  AWS ALB (HTTPS) │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │      EKS Cluster            │
+              │  ┌───────────────────────┐  │
+              │  │     Ingress Controller│  │
+              │  │     (nginx-ingress)   │  │
+              │  └───────────┬───────────┘  │
+              │              │              │
+              │  ┌───────────┴───────────┐  │
+              │  │    Service Mesh       │  │
+              │  │    (Istio)            │  │
+              │  └───┬───────┬───────┬───┘  │
+              │      │       │       │      │
+              │  ┌───┴──┐ ┌──┴───┐ ┌─┴────┐ │
+              │  │Web   │ │API   │ │Notif.│ │
+              │  │(Astro│ │(Nest │ │Svc   │ │
+              │  │React)│ │JS)   │ │      │ │
+              │  └──────┘ └──────┘ └──────┘ │
+              └─────────────────────────────┘
+```
+
+### Kubernetes Resources
+
+```yaml
+# Deployment - Web (Astro/React)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flor-futures-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flor-futures-web
+  template:
+    spec:
+      containers:
+      - name: web
+        image: <account>.dkr.ecr.us-east-1.amazonaws.com/flor-futures-web:latest
+        ports:
+        - containerPort: 4321
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+
+---
+# Deployment - API (NestJS)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flor-futures-api
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: api
+        image: <account>.dkr.ecr.us-east-1.amazonaws.com/flor-futures-api:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: flor-futures-secrets
+              key: database-url
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: flor-futures-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: flor-futures-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+```
+
+### CI/CD Pipeline
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Push to  │───►│  Build   │───►│  Push to │───►│  Deploy  │
+│  main     │    │  Docker  │    │  ECR     │    │  EKS     │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘
+     │               │               │               │
+     │          Run tests       Scan image     Rolling update
+     │          Lint/Type       Tag latest      Health check
+     │                                                 │
+     └──────────── Preview deploy (PRs) ◄──────────────┘
+```
+
+## 4. Migración Gradual a NestJS
+
+El diseño actual permite migrar de Supabase a NestJS **sin romper el frontend**:
+
+### Fase 1: Supabase (Actual)
+- Frontend → Supabase JS Client → Supabase DB
+- Auth: Supabase Auth
+- API: Auto-generada por Supabase
+
+### Fase 2: Hybrid
+- Frontend → NestJS API → Supabase DB
+- Auth: NestJS JWT (validado contra Supabase)
+- API: NestJS controllers
+
+### Fase 3: Full NestJS
+- Frontend → NestJS API → PostgreSQL (RDS)
+- Auth: NestJS Passport.js
+- API: NestJS microservicios
+
+**Por qué funciona**: El frontend solo conoce los tipos y las respuestas de API. Si la API cambia de Supabase a NestJS pero mantiene los mismos contratos de datos, el frontend no necesita cambios.
+
+## 5. Microservicios
+
+### Servicios del Sistema
+
+| Servicio | Responsabilidad | Stack |
+|----------|-----------------|-------|
+| **Web** | UI/UX, routing, rendering | Astro + React |
+| **API** | CRUD, validación, lógica negocio | NestJS + TypeORM |
+| **Auth** | Registro, login, tokens, roles | NestJS + Passport.js + JWT |
+| **Notifications** | Email, alerts, real-time | NestJS + Nodemailer + WebSocket |
+| **Gateway** | API routing, rate limiting, CORS | NestJS Gateway |
+
+### Comunicación entre Servicios
+
+```
+Web ──HTTP──► API Gateway ──► API Service
+                                  │
+                                  ├──► PostgreSQL (RDS)
+                                  │
+                                  └──► Redis (ElastiCache)
+                                       │
+                                  Notification Service
+                                       │
+                                  └──► Email (SES)
+```
+
+- **Síncrono**: HTTP/REST para CRUD operations
+- **Asíncrono**: Redis pub/sub para eventos (nueva oferta, contraoferta)
+- **WebSocket**: Notificaciones en tiempo real al frontend
+
+## 6. Monitoreo y Observabilidad
+
+### Stack de Monitoreo
+
+| Capa | Herramienta | Propósito |
+|------|-------------|-----------|
+| Logs | CloudWatch Logs | Logs estructurados de todos los servicios |
+| Métricas | Prometheus + Grafana | Métricas de negocio y sistema |
+| Tracing | Jaeger (via Istio) | Distributed tracing |
+| Alertas | CloudWatch Alarms | PagerDuty integration |
+
+### Métricas Clave
+
+- **Latencia P95** de API: < 200ms
+- **Error rate**: < 0.1%
+- **Disponibilidad**: > 99.9%
+- **Throughput**: > 1000 req/s
+
+## 7. Decisiones Técnicas Adicionales
+
+### TypeScript Estricto
+
+```json
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true
   }
 }
 ```
 
-**Ventajas:**
+### Testing Strategy
 
-1. **Imports limpios**: `import { supabase } from '@/lib/supabase'` vs `import { supabase } from '../../../lib/supabase'`
-2. **Refactoring seguro**: Mover archivos no rompe imports relativos
-3. **Legibilidad**: Rutas absolutas más fáciles de entender
-4. **Consistencia**: Estándar en proyectos TypeScript modernos
-
-**Ejemplo:**
-
-```typescript
-// Antes (relativo)
-import { supabase } from '../../lib/supabase';
-import type { User } from '../../types';
-
-// Después (alias @)
-import { supabase } from '@/lib/supabase';
-import type { User } from '@/types';
-```
-
-## 2. ¿Cómo maneja el sistema la seguridad de las transacciones?
-
-### Autenticación
-
-- **JWT (JSON Web Tokens)**: Supabase genera tokens JWT que se usan para autenticar cada petición.
-- **Session Management**: La sesión se mantiene en el cliente con localStorage y se valida en cada petición.
-- **Protección de rutas**: Las páginas del dashboard verifican la existencia del usuario antes de cargar datos.
-
-### Roles de Usuario
-
-Implementé un sistema de roles-flexible:
-
-```typescript
-type UserRole = 'cliente' | 'proveedor' | 'ambos';
-```
-
-- **Cliente**: Puede crear solicitudes y responder ofertas
-- **Proveedor**: Puede crear ofertas y responder contraofertas
-- **Ambos**: Puede realizar acciones de ambos roles
-
-### Row Level Security (RLS)
-
-Las políticas RLS garantizan que:
-
-1. **Los usuarios solo ven sus propios datos** (excepto información pública)
-2. **Los clientes solo pueden modificar sus solicitudes**
-3. **Los proveedores solo pueden crear ofertas en solicitudes abiertas**
-4. **Las contraofertas solo son visibles para las partes involucradas**
-
-Ejemplo de política:
-
-```sql
-CREATE POLICY "solicitudes_insert_cliente" ON solicitudes
-  FOR INSERT WITH CHECK (
-    cliente_id = auth.uid() AND
-    EXISTS (
-      SELECT 1 FROM usuarios
-      WHERE id = auth.uid() AND rol IN ('cliente', 'ambos')
-    )
-  );
-```
-
-## 3. ¿Cómo manejaría el crecimiento del sistema si tuviera que escalar?
-
-### Escalado Horizontal
-
-1. **Frontend**: Astro permite generar sites estáticos que CDN's como Vercel distribuyen globalmente.
-
-2. **Backend**: Supabase escala automáticamente con la carga. Para cargas extremas, se puede migrar a:
-   - **NestJS** con PostgreSQL dedicado
-   - **Microservicios** para dominios específicos
-
-3. **Base de datos**: 
-   - Índices optimizados para consultas frecuentes
-   - Particionamiento por fecha para tablas grandes
-   - Read replicas para distribuir carga de lectura
-
-### Migración a NestJS
-
-El diseño modular permite migrar gradualmente:
-
-1. **Fase 1**: Mantener Supabase para auth y base de datos
-2. **Fase 2**: Crear NestJS API para lógica de negocio compleja
-3. **Fase 3**: Migrar completamente a NestJS si es necesario
-
-### Monitoreo y Observabilidad
-
-- **Logs estructurados** para debugging
-- **Métricas de rendimiento** con herramientas como Datadog
-- **Alertas** para errores críticos
-- **Health checks** para monitoreo de servicios
-
-## 4. Otras Consideraciones
-
-### Tipo Seguro
-
-Usé TypeScript estricto con tipos definidos para toda la aplicación:
-
-- Tipos para entidades de negocio
-- Tipos para respuestas de API
-- Tipos para eventos de UI
-
-### Testing
-
-La arquitectura facilita:
-- **Unit tests** para stores de Zustand
-- **Integration tests** para componentes
-- **E2E tests** con Playwright o Cypress
-
-### Accesibilidad
-
-- Componentes semánticos de HTML
-- Soporte para lectores de pantalla
-- Navegación por teclado
-- Contraste de colores adecuado
+| Tipo | Herramienta | Cobertura objetivo |
+|------|-------------|-------------------|
+| Unit | Vitest | > 80% |
+| Integration | Vitest + MSW | > 70% |
+| E2E | Playwright | Flujos críticos |
+| Load | k6 | > 1000 concurrent users |
 
 ### Performance
 
-- **Code splitting** automático con Astro
-- **Lazy loading** de componentes React
-- **Optimización de imágenes** con Astro
-- **Minimización de bundle** con tree-shaking
+- **Astro**: HTML estático, 0kb JS por página estática
+- **React Islands**: Solo componentes interactivos cargan JS
+- **Code splitting**: Automático por ruta
+- **Lazy loading**: Imágenes y componentes pesados
 
 ## Conclusión
 
 Esta arquitectura equilibra:
-- **Rapidez de desarrollo** (1-2 horas para MVP)
-- **Calidad de código** (tipos, testing, seguridad)
-- **Escalabilidad** (preparado para crecimiento)
-- **Mantenibilidad** (código limpio y documentado)
 
-Es ideal para una prueba técnica donde se demostran buenas prácticas sin sobrecomplicar la solución.
+| Aspecto | Valoración |
+|---------|-----------|
+| Rapidez de desarrollo | ★★★★★ MVP en 1-2 semanas |
+| Calidad de código | ★★★★★ TypeScript + tests + review |
+| Escalabilidad | ★★★★★ K8s + microservicios |
+| Seguridad | ★★★★★ JWT + RLS + guards |
+| Mantenibilidad | ★★★★☆ Modular, documentado |
+| Costo | ★★★☆☆ AWS tiene costo, pero escalable |
+
+Es ideal para una prueba técnica que demuestra buenas prácticas de desarrollo fullstack con visión de escalabilidad real.
